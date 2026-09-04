@@ -72,6 +72,7 @@
 #include "src/ConfigManager/ConfigManager.h"
 #include "src/Display/Display.h"
 #include "src/Mqtt/MQTT_Client.h"
+#include "src/Mqtt/MQTT_Pluto.h"
 #include "src/Status.h"
 #include "src/Radio/Radio.h"
 #include "src/ArduinoOTA/ArduinoOTA.h"
@@ -82,7 +83,7 @@
 #include "src/Improv/tinygs_improv.h"
 
 
-#if  RADIOLIB_VERSION_MAJOR != (0x07) || RADIOLIB_VERSION_MINOR != (0x06) || RADIOLIB_VERSION_PATCH != (0x00) || RADIOLIB_VERSION_EXTRA != (0x00)
+#if  RADIOLIB_VERSION_MAJOR != (0x07) || RADIOLIB_VERSION_MINOR != (0x07) || RADIOLIB_VERSION_PATCH != (0x01) || RADIOLIB_VERSION_EXTRA != (0x00)
 #error "You are not using the correct version of RadioLib please copy TinyGS/lib/RadioLib on Arduino/libraries"
 #endif
 
@@ -94,6 +95,7 @@
 
 ConfigManager& configManager = ConfigManager::getInstance();
 MQTT_Client& mqtt = MQTT_Client::getInstance();
+MQTT_Pluto& mqttPluto = MQTT_Pluto::getInstance();
 Radio& radio = Radio::getInstance ();
 //TinyGSImprov improvWiFi = TinyGSImprov ();
 
@@ -172,6 +174,7 @@ void setup()
   displayShowInitialCredits();
   configManager.delay(1000);
   mqtt.begin ();
+  mqttPluto.begin ();
 
   if (configManager.getOledBright() == 0)
   {
@@ -324,6 +327,7 @@ void loop() {
   // connected
 
   mqtt.loop();
+  mqttPluto.loop();
   OTA::loop();
 
   displayUpdate ();

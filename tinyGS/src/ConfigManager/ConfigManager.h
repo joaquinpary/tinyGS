@@ -43,6 +43,7 @@ constexpr auto MQTT_SERVER_LENGTH = 31;
 constexpr auto MQTT_PORT_LENGTH = 6;
 constexpr auto MQTT_USER_LENGTH = 31;
 constexpr auto MQTT_PASS_LENGTH = 31;
+constexpr auto PLUTO_TOPIC_LENGTH = 31;
 constexpr auto CHECKBOX_LENGTH = 9;
 constexpr auto NUMBER_LEN = 32;
 constexpr auto TEMPLATE_LEN = 256;
@@ -68,6 +69,11 @@ constexpr auto configVersion = "0.05"; //max 4 chars
 
 #define MQTT_DEFAULT_SERVER "mqtt.tinygs.com"
 #define MQTT_DEFAULT_PORT "8883"
+
+// Secondary MQTT broker: the station forwards a copy of its telemetry there,
+// on top of what it already sends to TinyGS.
+#define PLUTO_DEFAULT_PORT "1883"
+#define PLUTO_DEFAULT_TOPIC "pluto"
 
 constexpr auto AP_TIMEOUT_MS = "300000";
 
@@ -168,6 +174,15 @@ public:
   const char *getMqttServer() { return mqttServer; }
   const char *getMqttUser() { return mqttUser; }
   const char *getMqttPass() { return mqttPass; }
+
+  const char *getPlutoServer() { return plutoServer; }
+  uint16_t getPlutoPort() { return (uint16_t)atoi(plutoPort); }
+  const char *getPlutoUser() { return plutoUser; }
+  const char *getPlutoPass() { return plutoPass; }
+  const char *getPlutoTopic() { return plutoTopic; }
+  // Only enabled if a server is also set: a checked box with an empty
+  // server field has nothing to connect to.
+  bool getPlutoEnabled() { return !strcmp(plutoEnable, CB_SELECTED_STR) && plutoServer[0] != '\0'; }
   float getLatitude() { return atof(latitude); }
   float getLongitude() { return atof(longitude); }
   const char *getTZ() { return tz + 3; } // +3 removes the first 3 digits used for time zone deduplication
@@ -330,6 +345,12 @@ private:
   char mqttPort[MQTT_PORT_LENGTH] = MQTT_DEFAULT_PORT;
   char mqttUser[MQTT_USER_LENGTH] = "";
   char mqttPass[MQTT_PASS_LENGTH] = "";
+  char plutoServer[MQTT_SERVER_LENGTH] = "";
+  char plutoPort[MQTT_PORT_LENGTH] = PLUTO_DEFAULT_PORT;
+  char plutoUser[MQTT_USER_LENGTH] = "";
+  char plutoPass[MQTT_PASS_LENGTH] = "";
+  char plutoTopic[PLUTO_TOPIC_LENGTH] = PLUTO_DEFAULT_TOPIC;
+  char plutoEnable[CHECKBOX_LENGTH] = "";
   char board[BOARD_LENGTH] = "";
   char oledBright[NUMBER_LEN] = "";
   char allowTx[CHECKBOX_LENGTH] = "";
@@ -365,6 +386,17 @@ private:
   iotwebconf2::TextParameter boardTemplateParam = iotwebconf2::TextParameter("Board Template (requires manual restart)", "board_template", boardTemplate, TEMPLATE_LEN, NULL, NULL, "type=\"text\" maxlength=255");
   iotwebconf2::TextParameter modemParam = iotwebconf2::TextParameter("Modem startup", "modem_startup", modemStartup, MODEM_LEN, "", "", "type=\"text\" maxlength=255");
   iotwebconf2::TextParameter advancedConfigParam = iotwebconf2::TextParameter("Advanced parameters", "advanced_config", advancedConfig, ADVANCED_LEN, NULL, NULL, "type=\"text\" maxlength=255");
+
+  // This group is registered LAST in the constructor on purpose: IotWebConf
+  // stores parameters back-to-back in EEPROM, in registration order, so adding
+  // it last keeps the positions of every parameter that already existed.
+  iotwebconf2::ParameterGroup groupPluto = iotwebconf2::ParameterGroup("pluto", "Secondary MQTT server (telemetry forwarding)");
+  iotwebconf2::CheckboxParameter plutoEnableParam = iotwebconf2::CheckboxParameter("Forward telemetry to secondary server", "pluto_en", plutoEnable, CHECKBOX_LENGTH, false);
+  iotwebconf2::TextParameter plutoServerParam = iotwebconf2::TextParameter("Server address", "pluto_server", plutoServer, MQTT_SERVER_LENGTH, NULL, "192.168.1.3", "type=\"text\" maxlength=30");
+  iotwebconf2::NumberParameter plutoPortParam = iotwebconf2::NumberParameter("Server Port", "pluto_port", plutoPort, MQTT_PORT_LENGTH, PLUTO_DEFAULT_PORT, NULL, "min=\"1\" max=\"65535\" step=\"1\"");
+  iotwebconf2::TextParameter plutoUserParam = iotwebconf2::TextParameter("MQTT Username", "pluto_user", plutoUser, MQTT_USER_LENGTH, NULL, NULL, "type=\"text\" maxlength=30");
+  iotwebconf2::PasswordParameter plutoPassParam = iotwebconf2::PasswordParameter("MQTT Password", "pluto_pass", plutoPass, MQTT_PASS_LENGTH, NULL, NULL, "ondblclick=\"pw(this.id)\" maxlength=30");
+  iotwebconf2::TextParameter plutoTopicParam = iotwebconf2::TextParameter("Topic Prefix", "pluto_topic", plutoTopic, PLUTO_TOPIC_LENGTH, PLUTO_DEFAULT_TOPIC, NULL, "type=\"text\" maxlength=30");
 };
 
 #endif

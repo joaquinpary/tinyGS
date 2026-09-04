@@ -18,6 +18,7 @@
 */
 
 #include "MQTT_Client.h"
+#include "MQTT_Pluto.h"
 #include "ArduinoJson.h"
 #if ARDUINOJSON_USE_LONG_LONG == 0 && !PLATFORMIO
 #error "Using Arduino IDE is not recommended, please follow this guide https://github.com/G4lile0/tinyGS/wiki/Arduino-IDE or edit /ArduinoJson/src/ArduinoJson/Configuration.hpp and amend to #define ARDUINOJSON_USE_LONG_LONG 1 around line 68"
@@ -458,7 +459,16 @@ void MQTT_Client::queueRx(const String& packet, bool noisy, const String& raw_pa
 // Procesar cola de paquetes pendientes (llamada desde loop)
 void MQTT_Client::processRxQueue()
 {
-  if (rxQueue == NULL || !connected())
+  MQTT_Pluto &pluto = MQTT_Pluto::getInstance();
+  bool toTinyGS = connected();
+  bool toPluto = pluto.connected();
+
+  // The queue drains if EITHER destination can receive. The condition used to
+  // be just connected() (TinyGS's), which tied the secondary forward to
+  // TinyGS's own availability. Nothing is lost on the TinyGS side: if
+  // TinyGS is down, the queue is only 10 slots and fills up in seconds, and
+  // after ~8 min connectionAtempts > connectionTimeout restarts anyway.
+  if (rxQueue == NULL || (!toTinyGS && !toPluto))
     return;
   
   RxPacketMessage msg;
@@ -466,7 +476,10 @@ void MQTT_Client::processRxQueue()
   // Procesar hasta 2 paquetes por ciclo para no bloquear demasiado tiempo
   int processed = 0;
   while (processed < 2 && xQueueReceive(rxQueue, &msg, 0) == pdTRUE) {
-    sendRxFromQueue(msg);
+    if (toTinyGS)
+      sendRxFromQueue(msg);   // TinyGS first: it's the primary obligation
+    if (toPluto)
+      pluto.publishRx(msg);   // secondary broker, best effort
     processed++;
   }
   
