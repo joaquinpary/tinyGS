@@ -189,6 +189,7 @@ public:
   uint8_t getBoard() { return atoi(board); }
   uint8_t getOledBright() { return atoi(oledBright); }
   bool getAllowTx() { return !strcmp(allowTx, CB_SELECTED_STR); }
+  bool getAutoUpdate() { return !strcmp(autoUpdate, CB_SELECTED_STR); }
   void setAllowTx(bool status)
   {
     if (status)
