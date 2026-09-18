@@ -135,6 +135,15 @@ ConfigManager::ConfigManager()
   groupAdvanced.addItem(&modemParam);
   groupAdvanced.addItem(&advancedConfigParam);
   addParameterGroup(&groupAdvanced);
+
+  // Last group: see the comment in ConfigManager.h about EEPROM ordering.
+  groupPluto.addItem(&plutoEnableParam);
+  groupPluto.addItem(&plutoServerParam);
+  groupPluto.addItem(&plutoPortParam);
+  groupPluto.addItem(&plutoUserParam);
+  groupPluto.addItem(&plutoPassParam);
+  groupPluto.addItem(&plutoTopicParam);
+  addParameterGroup(&groupPluto);
 }
 
 void ConfigManager::handleRoot()
@@ -667,6 +676,12 @@ void ConfigManager::resetAllConfig()
   telemetry3rd[0] = '\0';
   testMode[0] = '\0';
   autoUpdate[0] = '\0';
+  plutoServer[0] = '\0';
+  strncpy(plutoPort, PLUTO_DEFAULT_PORT, MQTT_PORT_LENGTH);
+  plutoUser[0] = '\0';
+  plutoPass[0] = '\0';
+  strncpy(plutoTopic, PLUTO_DEFAULT_TOPIC, PLUTO_TOPIC_LENGTH);
+  plutoEnable[0] = '\0';
   boardTemplate[0] = '\0';
   modemStartup[0] = '\0';
   advancedConfig[0] = '\0';
@@ -674,9 +689,45 @@ void ConfigManager::resetAllConfig()
   saveConfig();
 }
 
+// IotWebConf stores parameters back-to-back in EEPROM and only loads them if the
+// 4 version bytes match. The forwarding parameters were added at the end, in a region
+// that an already-configured station never wrote: virgin flash reads 0xFF, so
+// those buffers arrive with no null terminator and any strlen() would run out of
+// bounds. We sanitize them right after loadConfig() returns. There's no need to
+// bump configVersion, which would wipe wifi, station name and TinyGS credentials.
+// The first time the portal form is saved, the whole block is rewritten and this
+// stops having any effect, permanently.
+static void sanitizeNewParam(char *buf, size_t len, const char *defaultValue)
+{
+  bool terminated = false;
+  for (size_t i = 0; i < len; i++)
+  {
+    if (buf[i] == '\0')
+    {
+      terminated = true;
+      break;
+    }
+    if ((uint8_t)buf[i] < 0x20 || (uint8_t)buf[i] > 0x7E)
+      break; // non-printable byte before the terminator: the buffer is garbage
+  }
+
+  if (!terminated)
+  {
+    strncpy(buf, defaultValue, len - 1);
+    buf[len - 1] = '\0';
+  }
+}
+
 boolean ConfigManager::init()
 {
   boolean validConfig = IotWebConf2::init();
+
+  sanitizeNewParam(plutoEnable, CHECKBOX_LENGTH, "");
+  sanitizeNewParam(plutoServer, MQTT_SERVER_LENGTH, "");
+  sanitizeNewParam(plutoPort, MQTT_PORT_LENGTH, PLUTO_DEFAULT_PORT);
+  sanitizeNewParam(plutoUser, MQTT_USER_LENGTH, "");
+  sanitizeNewParam(plutoPass, MQTT_PASS_LENGTH, "");
+  sanitizeNewParam(plutoTopic, PLUTO_TOPIC_LENGTH, PLUTO_DEFAULT_TOPIC);
 
   // when wifi credentials are set but we are not able to connect (maybe wrong credentials)
   // we fall back to AP mode during 2 minutes after which we try to connect again and repeat.

@@ -86,6 +86,22 @@ void OTA::loop()
   if (millis() - lastUpdateTime > TIME_BETTWEN_UPDATE_CHECK)
   {
     lastUpdateTime = millis();
+
+    // "Automatic Firmware Update" only ever gated this hourly check in the UI's
+    // intent, never in code: the checkbox had no getter and this loop called
+    // update() unconditionally. A custom-firmware station (a fork, a local
+    // build with unmerged changes) can't safely leave this on, since the OTA
+    // server compares against status.git_version and would happily overwrite
+    // it with upstream's official build. The on-demand cmnd/update path (also
+    // reachable from tinygs/global, i.e. server-pushed to every station) is
+    // deliberately left ungated below, for anyone who wants to force an update
+    // by hand regardless of this setting.
+    if (!ConfigManager::getInstance().getAutoUpdate())
+    {
+      Log::debug(PSTR("Automatic firmware update disabled, skipping hourly check"));
+      return;
+    }
+
     update();
   }
 }
